@@ -31,9 +31,13 @@ const Login = () => {
   };
 
   const handleLogin = () => {
-    if (username === validUsers[role as keyof typeof validUsers].username && 
-        password === validUsers[role as keyof typeof validUsers].password) {
+    if (username.trim() === validUsers[role as keyof typeof validUsers].username && 
+        password.trim() === validUsers[role as keyof typeof validUsers].password) {
       localStorage.setItem("role", role);
+      toast({
+        title: "Login Successful",
+        description: `Welcome ${role === 'admin' ? 'Administrator' : 'User'}!`,
+      });
       navigate("/library");
     } else {
       toast({
