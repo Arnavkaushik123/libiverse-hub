@@ -21,6 +21,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 const Library = () => {
   const [role, setRole] = useState<string | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
+  const [adminBooks, setAdminBooks] = useState<Book[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<Book[]>([]);
   const [bookName, setBookName] = useState("");
@@ -42,6 +43,10 @@ const Library = () => {
     // Load books from localStorage
     const storedBooks = BookService.getLocalBooks();
     setBooks(storedBooks);
+    
+    // Load admin books
+    const storedAdminBooks = BookService.getAdminBooks();
+    setAdminBooks(storedAdminBooks);
     
     // Fetch book recommendations
     fetchRecommendations();
@@ -66,27 +71,54 @@ const Library = () => {
         id: Date.now(),
         name: bookName,
         author: author,
+        status: "Available"
       };
-      const updatedBooks = [...books, newBook];
-      setBooks(updatedBooks);
-      BookService.saveLocalBooks(updatedBooks);
+      
+      // For admin, add the book to the admin database
+      if (role === "admin") {
+        const updatedAdminBooks = [...adminBooks, newBook];
+        setAdminBooks(updatedAdminBooks);
+        BookService.saveAdminBooks(updatedAdminBooks);
+        toast({
+          title: "Book Added to Database",
+          description: `${bookName} has been added to the library database for all users.`,
+        });
+      } else {
+        // For regular users, add to their personal collection
+        const updatedBooks = [...books, newBook];
+        setBooks(updatedBooks);
+        BookService.saveLocalBooks(updatedBooks);
+        toast({
+          title: "Book Added",
+          description: `${bookName} has been added to your personal library.`,
+        });
+      }
+      
       setBookName("");
       setAuthor("");
-      toast({
-        title: "Book Added",
-        description: `${bookName} has been added to the library.`,
-      });
     }
   };
 
   const removeBook = (id: number) => {
-    const updatedBooks = books.filter(book => book.id !== id);
-    setBooks(updatedBooks);
-    BookService.saveLocalBooks(updatedBooks);
-    toast({
-      title: "Book Removed",
-      description: "The book has been removed from the library.",
-    });
+    if (role === "admin") {
+      // Remove from admin database
+      const updatedBooks = adminBooks.filter(book => book.id !== id);
+      setAdminBooks(updatedBooks);
+      BookService.saveAdminBooks(updatedBooks);
+      toast({
+        title: "Book Removed from Database",
+        description: "The book has been removed from the library database.",
+      });
+    } else {
+      // Remove from user's personal library
+      const updatedBooks = books.filter(book => book.id !== id);
+      setBooks(updatedBooks);
+      BookService.saveLocalBooks(updatedBooks);
+      toast({
+        title: "Book Removed",
+        description: "The book has been removed from your library.",
+      });
+    }
   };
 
   const borrowBook = (id: number) => {
@@ -147,7 +179,7 @@ const Library = () => {
       BookService.saveLocalBooks(updatedBooks);
       toast({
         title: "Book Added",
-        description: `${book.name} has been added to the local library.`,
+        description: `${book.name} has been added to your library.`,
       });
     } else {
       toast({
@@ -157,10 +189,11 @@ const Library = () => {
     }
   };
 
+  // For regular users, show both their personal books and search results
   const displayedBooks = role === "user" ? 
     [...books, ...searchResults.filter(result => 
       !books.some(book => book.name === result.name && book.author === result.author)
-    )] : books;
+    )] : adminBooks;
 
   const filteredBooks = displayedBooks.filter(book =>
     book.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -316,7 +349,7 @@ const Library = () => {
             <div className="mb-10">
               <Card className="glass-card border-white/20 mb-6">
                 <CardHeader>
-                  <CardTitle className="text-xl text-white">Add New Book</CardTitle>
+                  <CardTitle className="text-xl text-white">Add New Book to Database</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAddBook} className="space-y-4">
@@ -338,7 +371,7 @@ const Library = () => {
                       type="submit" 
                       className="w-full bg-purple-600 hover:bg-purple-700"
                     >
-                      Add Book
+                      Add Book to Database
                     </Button>
                   </form>
                 </CardContent>
@@ -354,8 +387,8 @@ const Library = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {books.length > 0 ? (
-                      books.map((book) => (
+                    {adminBooks.length > 0 ? (
+                      adminBooks.map((book) => (
                         <TableRow key={book.id}>
                           <TableCell className="font-medium">{book.name}</TableCell>
                           <TableCell>{book.author}</TableCell>
@@ -373,7 +406,7 @@ const Library = () => {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={3} className="text-center py-8">
-                          No books in the library. Add some books to get started.
+                          No books in the database. Add some books to get started.
                         </TableCell>
                       </TableRow>
                     )}
