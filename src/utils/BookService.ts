@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface Book {
@@ -57,13 +58,8 @@ export class BookService {
         book.author.toLowerCase().includes(query.toLowerCase())
       );
 
-      // If we found matches in the admin books, return those
-      if (localMatches.length > 0) {
-        return localMatches;
-      }
-
-      // Otherwise, search the Open Library API as fallback
-      const response = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&limit=20`);
+      // Use the Google Books API instead of Open Library
+      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20`);
       
       if (!response.ok) {
         throw new Error("Failed to fetch books");
@@ -71,17 +67,32 @@ export class BookService {
 
       const data = await response.json();
       
-      return data.docs.map((book: any, index: number) => ({
-        id: Date.now() + index, // Generate a unique ID
-        name: book.title,
-        author: book.author_name ? book.author_name.join(", ") : "Unknown",
-        coverImage: book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : undefined
-      }));
+      // Extract the relevant information from the Google Books API response
+      const apiBooks = data.items ? data.items.map((item: any, index: number) => {
+        const volumeInfo = item.volumeInfo;
+        return {
+          id: Date.now() + index,
+          name: volumeInfo.title || "Unknown Title",
+          author: volumeInfo.authors ? volumeInfo.authors.join(", ") : "Unknown Author",
+          coverImage: volumeInfo.imageLinks?.thumbnail,
+          status: "Available" // Mark all API books as available
+        };
+      }) : [];
+      
+      // Combine local matches with API results
+      const allResults = [...localMatches, ...apiBooks];
+      
+      // Remove duplicates based on book name and author
+      const uniqueResults = allResults.filter((book, index, self) =>
+        index === self.findIndex(b => b.name === book.name && b.author === book.author)
+      );
+      
+      return uniqueResults;
     } catch (error) {
       console.error("Error fetching books:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch books from the database",
+        description: "Failed to fetch books. Please try again later.",
         variant: "destructive",
       });
       return [];
@@ -98,8 +109,11 @@ export class BookService {
     }
 
     try {
-      // Fetch popular books from Open Library
-      const response = await fetch("https://openlibrary.org/search.json?q=subject:fiction&sort=rating&limit=10");
+      // Fetch popular books from Google Books API
+      const topics = ["fiction", "fantasy", "science", "bestseller", "classic"];
+      const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+      
+      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=subject:${randomTopic}&maxResults=10&orderBy=relevance`);
       
       if (!response.ok) {
         throw new Error("Failed to fetch recommendations");
@@ -107,12 +121,20 @@ export class BookService {
 
       const data = await response.json();
       
-      return data.docs.map((book: any, index: number) => ({
-        id: Date.now() + index,
-        name: book.title,
-        author: book.author_name ? book.author_name.join(", ") : "Unknown",
-        coverImage: book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : undefined
-      }));
+      if (!data.items || data.items.length === 0) {
+        throw new Error("No recommendations found");
+      }
+      
+      return data.items.map((item: any, index: number) => {
+        const volumeInfo = item.volumeInfo;
+        return {
+          id: Date.now() + index,
+          name: volumeInfo.title || "Unknown Title",
+          author: volumeInfo.authors ? volumeInfo.authors.join(", ") : "Unknown Author",
+          coverImage: volumeInfo.imageLinks?.thumbnail,
+          status: "Available"
+        };
+      });
     } catch (error) {
       console.error("Error fetching recommendations:", error);
       // Return fallback recommendations
