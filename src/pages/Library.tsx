@@ -5,32 +5,31 @@ import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Book, Search } from "lucide-react";
+import { Book as BookIcon, Search, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-
-interface BookType {
-  id: number;
-  name: string;
-  author: string;
-  status?: string;
-}
+import { BookService, Book } from "@/utils/BookService";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 const Library = () => {
   const [role, setRole] = useState<string | null>(null);
-  const [books, setBooks] = useState<BookType[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<Book[]>([]);
   const [bookName, setBookName] = useState("");
   const [author, setAuthor] = useState("");
+  const [recommendations, setRecommendations] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // Top book recommendations
-  const topPicks = [
-    "To Kill a Mockingbird", "1984", "Pride and Prejudice", 
-    "The Great Gatsby", "Moby-Dick", "War and Peace", 
-    "The Catcher in the Rye", "The Hobbit", 
-    "Harry Potter and the Sorcerer's Stone", "Crime and Punishment"
-  ];
 
   useEffect(() => {
     const userRole = localStorage.getItem("role");
@@ -41,9 +40,24 @@ const Library = () => {
     setRole(userRole);
     
     // Load books from localStorage
-    const storedBooks = JSON.parse(localStorage.getItem("books") || "[]");
+    const storedBooks = BookService.getLocalBooks();
     setBooks(storedBooks);
+    
+    // Fetch book recommendations
+    fetchRecommendations();
   }, [navigate]);
+
+  const fetchRecommendations = async () => {
+    setLoading(true);
+    try {
+      const recommendedBooks = await BookService.getRecommendations();
+      setRecommendations(recommendedBooks);
+    } catch (error) {
+      console.error("Failed to fetch recommendations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddBook = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +69,7 @@ const Library = () => {
       };
       const updatedBooks = [...books, newBook];
       setBooks(updatedBooks);
-      localStorage.setItem("books", JSON.stringify(updatedBooks));
+      BookService.saveLocalBooks(updatedBooks);
       setBookName("");
       setAuthor("");
       toast({
@@ -68,7 +82,7 @@ const Library = () => {
   const removeBook = (id: number) => {
     const updatedBooks = books.filter(book => book.id !== id);
     setBooks(updatedBooks);
-    localStorage.setItem("books", JSON.stringify(updatedBooks));
+    BookService.saveLocalBooks(updatedBooks);
     toast({
       title: "Book Removed",
       description: "The book has been removed from the library.",
@@ -80,7 +94,7 @@ const Library = () => {
       book.id === id ? { ...book, status: "Borrowed" } : book
     );
     setBooks(updatedBooks);
-    localStorage.setItem("books", JSON.stringify(updatedBooks));
+    BookService.saveLocalBooks(updatedBooks);
     toast({
       title: "Book Borrowed",
       description: "You have successfully borrowed this book.",
@@ -92,14 +106,63 @@ const Library = () => {
       book.id === id ? { ...book, status: "Available" } : book
     );
     setBooks(updatedBooks);
-    localStorage.setItem("books", JSON.stringify(updatedBooks));
+    BookService.saveLocalBooks(updatedBooks);
     toast({
       title: "Book Returned",
       description: "You have successfully returned this book.",
     });
   };
 
-  const filteredBooks = books.filter(book =>
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setSearchLoading(true);
+    try {
+      const results = await BookService.searchBooks(searchTerm);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search error:", error);
+      toast({
+        title: "Search Failed",
+        description: "Failed to retrieve search results.",
+        variant: "destructive",
+      });
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const addToLocalLibrary = (book: Book) => {
+    const existingBook = books.find(b => 
+      b.name === book.name && b.author === book.author
+    );
+    
+    if (!existingBook) {
+      const updatedBooks = [...books, { ...book, status: "Available" }];
+      setBooks(updatedBooks);
+      BookService.saveLocalBooks(updatedBooks);
+      toast({
+        title: "Book Added",
+        description: `${book.name} has been added to the local library.`,
+      });
+    } else {
+      toast({
+        title: "Book Already Exists",
+        description: "This book is already in your library.",
+      });
+    }
+  };
+
+  const displayedBooks = role === "user" ? 
+    [...books, ...searchResults.filter(result => 
+      !books.some(book => book.name === result.name && book.author === result.author)
+    )] : books;
+
+  const filteredBooks = displayedBooks.filter(book =>
     book.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     book.author.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -116,49 +179,89 @@ const Library = () => {
             <>
               <div className="mb-10">
                 <h2 className="text-2xl font-semibold mb-4">Top Picks for You</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  {topPicks.map((book, index) => (
-                    <Card key={index} className="glass-card border-white/20">
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <Book className="h-6 w-6 text-purple-400" />
-                        <span className="text-white">{book}</span>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {recommendations.map((book, index) => (
+                      <Card key={index} className="glass-card border-white/20 hover:border-purple-400/50 transition-all">
+                        <CardContent className="p-4">
+                          {book.coverImage ? (
+                            <img 
+                              src={book.coverImage} 
+                              alt={book.name}
+                              className="w-full h-40 object-cover rounded mb-2"
+                            />
+                          ) : (
+                            <div className="w-full h-40 bg-purple-900/30 flex items-center justify-center rounded mb-2">
+                              <BookIcon className="h-8 w-8 text-purple-400" />
+                            </div>
+                          )}
+                          <h3 className="text-sm font-medium line-clamp-2">{book.name}</h3>
+                          <p className="text-xs text-gray-400 mt-1">{book.author}</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full mt-2"
+                            onClick={() => addToLocalLibrary(book)}
+                          >
+                            Add to Library
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="mb-10">
                 <h2 className="text-2xl font-semibold mb-4">Find a Book</h2>
-                <div className="flex items-center glass-card border-white/20 p-2 rounded-md mb-4 w-full max-w-md">
-                  <Search className="h-5 w-5 text-gray-400 mr-2" />
-                  <Input
-                    type="search"
-                    placeholder="Search by title or author..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="bg-transparent border-none text-white focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-gray-400"
-                  />
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center glass-card border-white/20 p-2 rounded-md w-full">
+                      <Search className="h-5 w-5 text-gray-400 mr-2" />
+                      <Input
+                        type="search"
+                        placeholder="Search by title or author..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="bg-transparent border-none text-white focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-gray-400"
+                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                      />
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={handleSearch}
+                    disabled={searchLoading}
+                  >
+                    {searchLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Search'
+                    )}
+                  </Button>
                 </div>
 
-                <div className="overflow-x-auto glass-card border-white/20 rounded-lg">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr>
-                        <th className="p-4 border-b border-white/10">Name</th>
-                        <th className="p-4 border-b border-white/10">Author</th>
-                        <th className="p-4 border-b border-white/10">Status</th>
-                        <th className="p-4 border-b border-white/10">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <div className="glass-card border-white/20 rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-white">Title</TableHead>
+                        <TableHead className="text-white">Author</TableHead>
+                        <TableHead className="text-white">Status</TableHead>
+                        <TableHead className="text-white">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {filteredBooks.length > 0 ? (
                         filteredBooks.map((book) => (
-                          <tr key={book.id}>
-                            <td className="p-4 border-b border-white/10">{book.name}</td>
-                            <td className="p-4 border-b border-white/10">{book.author}</td>
-                            <td className="p-4 border-b border-white/10">{book.status || "Available"}</td>
-                            <td className="p-4 border-b border-white/10">
+                          <TableRow key={book.id}>
+                            <TableCell className="font-medium">{book.name}</TableCell>
+                            <TableCell>{book.author}</TableCell>
+                            <TableCell>{book.status || "Available"}</TableCell>
+                            <TableCell>
                               {book.status === "Borrowed" ? (
                                 <Button 
                                   variant="outline" 
@@ -176,17 +279,35 @@ const Library = () => {
                                   Borrow
                                 </Button>
                               )}
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         ))
                       ) : (
-                        <tr>
-                          <td colSpan={4} className="p-4 text-center">No books found</td>
-                        </tr>
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8">
+                            No books found. Try searching for a book above.
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
+                
+                {filteredBooks.length > 0 && (
+                  <Pagination className="mt-4">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious href="#" />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationLink href="#" isActive>1</PaginationLink>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext href="#" />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                )}
               </div>
             </>
           )}
@@ -223,22 +344,22 @@ const Library = () => {
                 </CardContent>
               </Card>
 
-              <div className="overflow-x-auto glass-card border-white/20 rounded-lg">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr>
-                      <th className="p-4 border-b border-white/10">Name</th>
-                      <th className="p-4 border-b border-white/10">Author</th>
-                      <th className="p-4 border-b border-white/10">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="glass-card border-white/20 rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-white">Title</TableHead>
+                      <TableHead className="text-white">Author</TableHead>
+                      <TableHead className="text-white">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {books.length > 0 ? (
                       books.map((book) => (
-                        <tr key={book.id}>
-                          <td className="p-4 border-b border-white/10">{book.name}</td>
-                          <td className="p-4 border-b border-white/10">{book.author}</td>
-                          <td className="p-4 border-b border-white/10">
+                        <TableRow key={book.id}>
+                          <TableCell className="font-medium">{book.name}</TableCell>
+                          <TableCell>{book.author}</TableCell>
+                          <TableCell>
                             <Button 
                               variant="destructive"
                               size="sm"
@@ -246,16 +367,18 @@ const Library = () => {
                             >
                               Remove
                             </Button>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))
                     ) : (
-                      <tr>
-                        <td colSpan={3} className="p-4 text-center">No books in the library</td>
-                      </tr>
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8">
+                          No books in the library. Add some books to get started.
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </div>
           )}
