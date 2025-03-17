@@ -58,7 +58,7 @@ export class BookService {
         book.author.toLowerCase().includes(query.toLowerCase())
       );
 
-      // Use the Google Books API instead of Open Library
+      // Always search the Google Books API regardless of local matches
       const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20`);
       
       if (!response.ok) {
@@ -87,6 +87,7 @@ export class BookService {
         index === self.findIndex(b => b.name === book.name && b.author === book.author)
       );
       
+      console.log(`Search results: ${uniqueResults.length} books found`);
       return uniqueResults;
     } catch (error) {
       console.error("Error fetching books:", error);
@@ -139,11 +140,11 @@ export class BookService {
       console.error("Error fetching recommendations:", error);
       // Return fallback recommendations
       return [
-        { id: 1, name: "To Kill a Mockingbird", author: "Harper Lee" },
-        { id: 2, name: "1984", author: "George Orwell" },
-        { id: 3, name: "Pride and Prejudice", author: "Jane Austen" },
-        { id: 4, name: "The Great Gatsby", author: "F. Scott Fitzgerald" },
-        { id: 5, name: "Moby-Dick", author: "Herman Melville" }
+        { id: 1, name: "To Kill a Mockingbird", author: "Harper Lee", status: "Available" },
+        { id: 2, name: "1984", author: "George Orwell", status: "Available" },
+        { id: 3, name: "Pride and Prejudice", author: "Jane Austen", status: "Available" },
+        { id: 4, name: "The Great Gatsby", author: "F. Scott Fitzgerald", status: "Available" },
+        { id: 5, name: "Moby-Dick", author: "Herman Melville", status: "Available" }
       ];
     }
   }

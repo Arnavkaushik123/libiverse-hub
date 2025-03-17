@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -155,6 +154,15 @@ const Library = () => {
     try {
       const results = await BookService.searchBooks(searchTerm);
       setSearchResults(results);
+      
+      if (results.length === 0) {
+        toast({
+          title: "No books found",
+          description: "Try a different search term",
+        });
+      } else {
+        console.log(`Found ${results.length} books for "${searchTerm}"`);
+      }
     } catch (error) {
       console.error("Search error:", error);
       toast({
@@ -162,7 +170,6 @@ const Library = () => {
         description: "Failed to retrieve search results.",
         variant: "destructive",
       });
-      setSearchResults([]);
     } finally {
       setSearchLoading(false);
     }
@@ -191,14 +198,20 @@ const Library = () => {
 
   // For regular users, show both their personal books and search results
   const displayedBooks = role === "user" ? 
-    [...books, ...searchResults.filter(result => 
-      !books.some(book => book.name === result.name && book.author === result.author)
-    )] : adminBooks;
+    [
+      ...books,
+      ...searchResults.filter(result => 
+        !books.some(book => book.name === result.name && book.author === result.author)
+      )
+    ] : adminBooks;
 
-  const filteredBooks = displayedBooks.filter(book =>
-    book.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.author.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter books based on search term
+  const filteredBooks = searchTerm.trim() !== "" ? 
+    displayedBooks.filter(book =>
+      book.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      book.author.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : 
+    (role === "user" ? books : adminBooks);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black text-white">
@@ -422,3 +435,4 @@ const Library = () => {
 };
 
 export default Library;
+
