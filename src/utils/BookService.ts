@@ -22,7 +22,25 @@ export class BookService {
 
   // Get admin-added books (shared database)
   static getAdminBooks(): Book[] {
-    return JSON.parse(localStorage.getItem("admin_books") || "[]");
+    // Initialize default admin books if none exist
+    const adminBooks = JSON.parse(localStorage.getItem("admin_books") || "[]");
+    if (adminBooks.length === 0) {
+      const defaultBooks = [
+        { id: 1000001, name: "To Kill a Mockingbird", author: "Harper Lee", status: "Available" },
+        { id: 1000002, name: "1984", author: "George Orwell", status: "Available" },
+        { id: 1000003, name: "Pride and Prejudice", author: "Jane Austen", status: "Available" },
+        { id: 1000004, name: "The Great Gatsby", author: "F. Scott Fitzgerald", status: "Available" },
+        { id: 1000005, name: "Moby-Dick", author: "Herman Melville", status: "Available" },
+        { id: 1000006, name: "The Lord of the Rings", author: "J.R.R. Tolkien", status: "Available" },
+        { id: 1000007, name: "The Catcher in the Rye", author: "J.D. Salinger", status: "Available" },
+        { id: 1000008, name: "Harry Potter and the Sorcerer's Stone", author: "J.K. Rowling", status: "Available" },
+        { id: 1000009, name: "The Hobbit", author: "J.R.R. Tolkien", status: "Available" },
+        { id: 1000010, name: "Brave New World", author: "Aldous Huxley", status: "Available" }
+      ];
+      localStorage.setItem("admin_books", JSON.stringify(defaultBooks));
+      return defaultBooks;
+    }
+    return adminBooks;
   }
 
   // Save admin-added books (shared database)

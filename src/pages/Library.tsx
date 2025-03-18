@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -43,7 +44,7 @@ const Library = () => {
     const storedBooks = BookService.getLocalBooks();
     setBooks(storedBooks);
     
-    // Load admin books
+    // Load admin books - this will now initialize with default books if empty
     const storedAdminBooks = BookService.getAdminBooks();
     setAdminBooks(storedAdminBooks);
     
@@ -435,4 +436,3 @@ const Library = () => {
 };
 
 export default Library;
-
