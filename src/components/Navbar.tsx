@@ -16,8 +16,16 @@ const Navbar = () => {
     };
 
     checkLoginStatus();
-    // Re-check whenever the location changes
-    window.addEventListener('storage', checkLoginStatus);
+    
+    // Create a custom event listener for login/logout
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'role') {
+        checkLoginStatus();
+      }
+    });
+    
+    // Re-check whenever location changes
+    checkLoginStatus();
     
     return () => {
       window.removeEventListener('storage', checkLoginStatus);
@@ -27,6 +35,8 @@ const Navbar = () => {
   const handleLogout = () => {
     localStorage.removeItem("role");
     setIsLoggedIn(false);
+    // Dispatch a storage event to notify other components
+    window.dispatchEvent(new Event('storage'));
     navigate("/");
   };
 
